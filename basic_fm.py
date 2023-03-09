@@ -35,6 +35,8 @@ import signal
 from argparse import ArgumentParser
 from gnuradio.eng_arg import eng_float, intx
 from gnuradio import eng_notation
+from gnuradio.qtgui import Range, RangeWidget
+from PyQt5 import QtCore
 import osmosdr
 import time
 
@@ -78,14 +80,18 @@ class basic_fm(gr.top_block, Qt.QWidget):
         ##################################################
         # Variables
         ##################################################
-        self.samp_rate = samp_rate = 10e6
+        self.samp_rate = samp_rate = 20e6
         self.channel_width = channel_width = 200e3
         self.channel_freq = channel_freq = 94.5e6
         self.center_freq = center_freq = 97.9e6
+        self.audio_gain = audio_gain = 1
 
         ##################################################
         # Blocks
         ##################################################
+        self._audio_gain_range = Range(0, 10, 0.1, 1, 1)
+        self._audio_gain_win = RangeWidget(self._audio_gain_range, self.set_audio_gain, "'audio_gain'", "slider", float, QtCore.Qt.Horizontal)
+        self.top_layout.addWidget(self._audio_gain_win)
         self.rational_resampler_xxx_0 = filter.rational_resampler_ccc(
                 interpolation=12,
                 decimation=5,
@@ -158,6 +164,7 @@ class basic_fm(gr.top_block, Qt.QWidget):
                 window.WIN_HAMMING,
                 6.76))
         self.blocks_multiply_xx_0 = blocks.multiply_vcc(1)
+        self.blocks_multiply_const_vxx_0 = blocks.multiply_const_ff(audio_gain)
         self.audio_sink_0 = audio.sink(48000, 'pulse', True)
         self.analog_wfm_rcv_0 = analog.wfm_rcv(
         	quad_rate=480e3,
@@ -170,7 +177,8 @@ class basic_fm(gr.top_block, Qt.QWidget):
         # Connections
         ##################################################
         self.connect((self.analog_sig_source_x_0, 0), (self.blocks_multiply_xx_0, 1))
-        self.connect((self.analog_wfm_rcv_0, 0), (self.audio_sink_0, 0))
+        self.connect((self.analog_wfm_rcv_0, 0), (self.blocks_multiply_const_vxx_0, 0))
+        self.connect((self.blocks_multiply_const_vxx_0, 0), (self.audio_sink_0, 0))
         self.connect((self.blocks_multiply_xx_0, 0), (self.low_pass_filter_0, 0))
         self.connect((self.blocks_multiply_xx_0, 0), (self.qtgui_freq_sink_x_0_0, 0))
         self.connect((self.low_pass_filter_0, 0), (self.rational_resampler_xxx_0, 0))
@@ -217,6 +225,13 @@ class basic_fm(gr.top_block, Qt.QWidget):
         self.center_freq = center_freq
         self.analog_sig_source_x_0.set_frequency(self.center_freq - self.channel_freq)
         self.osmosdr_source_0.set_center_freq(self.center_freq, 0)
+
+    def get_audio_gain(self):
+        return self.audio_gain
+
+    def set_audio_gain(self, audio_gain):
+        self.audio_gain = audio_gain
+        self.blocks_multiply_const_vxx_0.set_k(self.audio_gain)
 
 
 
